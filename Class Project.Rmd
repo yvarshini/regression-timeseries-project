@@ -1,0 +1,408 @@
+---
+title: "Regression Final Project"
+output:
+  html_document:
+    df_print: paged
+author: "Cheryl Allen-Munley and Varshini Yanamandra"
+---
+
+```{r}
+library(readxl)	
+library(car)
+library(MASS)
+library(TSA)
+library(ggplot2)
+library(tidyr)
+library(broom)
+```
+
+```{r}
+#Loading the political database
+PolData = 	read_excel(file.choose())
+PolData <- na.omit(PolData)
+PolData				
+```
+
+```{r}
+# converting string data into numbers
+# 1 for Democrats and 2 for Republicans 
+PolData$PresParty_label <- PolData$PresParty
+PolData$PresParty <- as.factor(PolData$PresParty)
+PolData$PresParty <- as.numeric(PolData$PresParty)
+                                
+PolData$SenParty_label <- PolData$SenParty
+PolData$SenParty <- as.factor(PolData$SenParty)
+PolData$SenParty <- as.numeric(PolData$SenParty)
+
+PolData$HouseParty_label <- PolData$HouseParty
+PolData$HouseParty <- as.factor(PolData$HouseParty)
+PolData$HouseParty <- as.numeric(PolData$HouseParty)
+
+PolData$TrifectaFlag_label <- PolData$TrifectaFlag
+PolData$TrifectaFlag <- as.factor(PolData$TrifectaFlag)
+PolData$TrifectaFlag <- as.numeric(PolData$TrifectaFlag)
+PolData$TrifectaFlag <- replace(PolData$TrifectaFlag, PolData$TrifectaFlag == 2, 0)
+```
+```{r}
+PolData$TrifectaFlag <- replace(PolData$TrifectaFlag, PolData$TrifectaFlag == 3, 2)
+PolData
+```
+Creating preliminary models
+```{r}
+inflationModeli <- lm(MeanAnnualInflation ~ PresParty + SenParty + HouseParty + TrifectaFlag, data = PolData)
+summary(inflationModeli)
+```
+
+```{r}
+glance(inflationModeli)
+```
+
+```{r}
+inflationModel <- lm(MeanAnnualInflation ~ PresParty + SenParty + HouseParty + TrifectaFlag - 1, data = PolData)
+summary(inflationModel)
+```
+```{r}
+minWageModeli <- lm(AdjMinWage ~ PresParty + SenParty + HouseParty + TrifectaFlag, data = PolData)
+summary(minWageModeli)
+```
+```{r}
+minWageModel <- lm(AdjMinWage ~ PresParty + SenParty + HouseParty + TrifectaFlag - 1, data = PolData)
+summary(minWageModel)
+```
+```{r}
+GDPModeli <- lm(GDP_AnnualGrowth ~ PresParty + SenParty + HouseParty + TrifectaFlag, data = PolData)
+summary(GDPModeli)
+```
+```{r}
+GDPModel <- lm(GDP_AnnualGrowth ~ PresParty + SenParty + HouseParty + TrifectaFlag - 1, data = PolData)
+summary(GDPModel)
+```
+```{r}
+unemploymentModeli <- lm(UnemploymentRateDecember ~ PresParty + SenParty + HouseParty + TrifectaFlag, data = PolData)
+summary(unemploymentModeli)
+```
+
+```{r}
+unemploymentModel <- lm(UnemploymentRateDecember ~ PresParty + SenParty + HouseParty + TrifectaFlag - 1, data = PolData)
+summary(unemploymentModel)
+```
+
+Perform backward selection on each of the 4 response variable models. The no-intercept models are chosen as they have better R-squared values for every response variable.
+
+```{r}
+print("ADJUSTED R SQUARED VALUES")
+print("Inflation model")
+summary(inflationModeli)$adj.r.squared
+print("Inflation model without intercept")
+summary(inflationModel)$adj.r.squared
+
+print("Minimum Wage model")
+summary(minWageModeli)$adj.r.squared
+print("Minimum Wage model without intercept")
+summary(minWageModel)$adj.r.squared
+
+print("GDP model")
+summary(GDPModeli)$adj.r.squared
+print("GDP model without intercept")
+summary(GDPModel)$adj.r.squared
+
+print("Unemployment model")
+summary(unemploymentModeli)$adj.r.squared
+print("Unemployment model without intercept")
+summary(unemploymentModel)$adj.r.squared
+```
+
+Backward selection on models without intercept
+```{r}
+inflation.backward <- step(inflationModel, scope = list(lower=~1), direction = "backward", k=2, trace=FALSE)
+summary(inflation.backward)
+```
+
+```{r}
+minimumWage.backward <- step(minWageModel, scope = list(lower=~1), direction = "backward", k=2, trace=FALSE)
+summary(minimumWage.backward)
+```
+
+```{r}
+plot(minimumWage.backward)
+```
+
+```{r}
+GDP.backward <- step(GDPModel, scope = list(lower=~1), direction = "backward", k=2, trace=FALSE)
+summary(GDP.backward)
+```
+
+```{r}
+unemployment.backward <- step(unemploymentModel, scope = list(lower=~1), direction = "backward", k=2, trace=FALSE)
+summary(unemployment.backward)
+```
+Optimum: UnemploymentRateDecember ~ PresParty and HouseParty with no lag
+
+```{r}
+plot(unemployment.backward)
+```
+
+```{r}
+boxplot(UnemploymentRateDecember~PolData$PresParty_label,data=PolData, xlab="Party", ylab = "Unemployment Rate" ,col=c("blue", "red"),main ="Unemployment Rate versus Presidential Party")
+boxplot(UnemploymentRateDecember~HouseParty_label,data=PolData,xlab="Party", ylab = "Unemployment Rate",col=c("blue","red"),main =" Unemployment Rate versus House Party")
+```
+
+Explore the effect of lag on inflation
+```{r}
+# lag 1
+PolData.inf <- PolData[, c(2, 3, 7, 12, 13)]
+PolData.inf$MeanAnnualInflation <- c(NA, head(PolData.inf$MeanAnnualInflation, -1))
+PolData.inf <- na.omit(PolData.inf)
+PolData.infmodel1 <- lm(MeanAnnualInflation ~ PresParty + SenParty - 1, data = PolData.inf)
+summary(PolData.infmodel1)
+```
+
+```{r}
+# lag 2
+PolData.inf$MeanAnnualInflation <- c(NA, head(PolData.inf$MeanAnnualInflation, -1))
+PolData.inf <- na.omit(PolData.inf)
+PolData.infmodel2 <- lm(MeanAnnualInflation ~ PresParty + SenParty - 1, data = PolData.inf)
+summary(PolData.infmodel2)
+```
+Optimum: MeanAnnualInflation ~ PresParty and SenParty with lag 2
+
+```{r}
+plot(PolData.infmodel2)
+```
+
+```{r}
+boxplot(MeanAnnualInflation~PresParty_label,data=PolData.inf, xlab="Party", ylab = "Inflation" ,col=c("blue", "red"),main ="Mean Annual Inflation versus Presidential Party")
+boxplot(MeanAnnualInflation~SenParty_label,data=PolData.inf,xlab="Party", ylab = "Inflation", col=c("blue", "red"),main ="Mean Annual Inflation versus Senate Party")
+```
+
+```{r}
+# lag 3
+PolData.inf$MeanAnnualInflation <- c(NA, head(PolData.inf$MeanAnnualInflation, -1))
+PolData.inf <- na.omit(PolData.inf)
+PolData.infmodel3 <- lm(MeanAnnualInflation ~ PresParty + SenParty - 1, data = PolData.inf)
+summary(PolData.infmodel3)
+```
+
+```{r}
+# lag 4
+PolData.inf$MeanAnnualInflation <- c(NA, head(PolData.inf$MeanAnnualInflation, -1))
+PolData.inf <- na.omit(PolData.inf)
+PolData.infmodel4 <- lm(MeanAnnualInflation ~ PresParty + SenParty - 1, data = PolData.inf)
+summary(PolData.infmodel4)
+```
+
+```{r}
+plot(PolData.infmodel2)
+```
+
+Explore the effect of lag on GDP
+```{r}
+# lag 1
+PolData.gdp <- PolData[, c(2, 5, 9, 12, 15)]
+PolData.gdp$GDP_AnnualGrowth <- c(NA, head(PolData.gdp$GDP_AnnualGrowth, -1))
+PolData.gdp <- na.omit(PolData.gdp)
+PolData.gdpmodel1 <- lm(GDP_AnnualGrowth ~ PresParty + TrifectaFlag - 1, data = PolData.gdp)
+summary(PolData.gdpmodel1)
+```
+
+```{r}
+# lag 2
+PolData.gdp$GDP_AnnualGrowth <- c(NA, head(PolData.gdp$GDP_AnnualGrowth, -1))
+PolData.gdp <- na.omit(PolData.gdp)
+PolData.gdpmodel2 <- lm(GDP_AnnualGrowth ~ PresParty + TrifectaFlag - 1, data = PolData.gdp)
+summary(PolData.gdpmodel2)
+```
+Optimum: GDP_AnnualGrowth ~ PresParty and TrifectaFlag with lag 2
+
+```{r}
+plot(PolData.gdpmodel2)
+```
+
+```{r}
+boxplot(GDP_AnnualGrowth~PresParty_label,data=PolData.gdp, xlab="Party", ylab = "GDP Growth" ,col=c("blue", "red"),main ="GDP Annual Growth versus Presidential Party")
+boxplot(GDP_AnnualGrowth~TrifectaFlag_label,data=PolData.gdp,xlab="Party", ylab = "GDP Growth",col=c("blue", "grey", "red"),main ="GDP Annual Growth versus TrifectaFlag")
+```
+
+```{r}
+# lag 3
+PolData.gdp$GDP_AnnualGrowth <- c(NA, head(PolData.gdp$GDP_AnnualGrowth, -1))
+PolData.gdp <- na.omit(PolData.gdp)
+PolData.gdpmodel3 <- lm(GDP_AnnualGrowth ~ PresParty + TrifectaFlag - 1, data = PolData.gdp)
+summary(PolData.gdpmodel3)
+```
+
+```{r}
+# lag 4
+PolData.gdp$GDP_AnnualGrowth <- c(NA, head(PolData.gdp$GDP_AnnualGrowth, -1))
+PolData.gdp <- na.omit(PolData.gdp)
+PolData.gdpmodel4 <- lm(GDP_AnnualGrowth ~ PresParty + TrifectaFlag - 1, data = PolData.gdp)
+summary(PolData.gdpmodel4)
+```
+Since the best performing GDP model is lag 2, it was chosen to perform a residual analysis
+
+```{r}
+plot(PolData.gdpmodel2)
+```
+
+Explore the effect of lag on Minimum Wage
+```{r}
+# lag 1
+PolData.minWage <- PolData[, c(2, 4, 11, 12, 14)]
+PolData.minWage$AdjMinWage <- c(NA, head(PolData.minWage$AdjMinWage, -1))
+PolData.minWage <- na.omit(PolData.minWage)
+PolData.minWagemodel1 <- lm(AdjMinWage ~ PresParty + HouseParty - 
+    1, data = PolData.minWage)
+summary(PolData.minWagemodel1)
+```
+
+```{r}
+# lag 2
+PolData.minWage$AdjMinWage <- c(NA, head(PolData.minWage$AdjMinWage, -1))
+PolData.minWage <- na.omit(PolData.minWage)
+PolData.minWagemodel2 <- lm(AdjMinWage ~ PresParty + HouseParty - 
+    1, data = PolData.minWage)
+summary(PolData.minWagemodel2)
+```
+
+```{r}
+# lag 3
+PolData.minWage$AdjMinWage <- c(NA, head(PolData.minWage$AdjMinWage, -1))
+PolData.minWage <- na.omit(PolData.minWage)
+PolData.minWagemodel3 <- lm(AdjMinWage ~ PresParty + HouseParty - 
+    1, data = PolData.minWage)
+summary(PolData.minWagemodel3)
+```
+Optimum: AdjMinWage ~ PresParty and HouseParty with lag 3
+
+```{r}
+plot(PolData.minWagemodel3)
+```
+
+```{r}
+boxplot(AdjMinWage~PresParty_label,data=PolData.minWage, xlab="Party", ylab = "Minimum Wage" ,col=c("blue", "red"),main ="Adjusted Minimum Wage versus Presidential Party")
+boxplot(AdjMinWage~HouseParty_label,data=PolData.minWage,xlab="Party", ylab = "Minimum Wage",col=c("blue", "red"),main ="Adjusted Minimum Wage versus House Party")
+```
+
+```{r }
+ plot_minwage<- ggplot(data = PolData, aes(as.numeric(Year), AdjMinWage)) +xlab("Year") + ylab("Minimum Wage") +
+  geom_point() +
+  ggtitle("Adjusted Minimum Wage over Time") +
+  geom_smooth()
+plot_minwage
+```
+
+```{r}
+# lag 4
+PolData.minWage$AdjMinWage <- c(NA, head(PolData.minWage$AdjMinWage, -1))
+PolData.minWage$AdjMinWage <- c(NA, head(PolData.minWage$AdjMinWage, -1))
+PolData.minWage <- na.omit(PolData.minWage)
+PolData.minWagemodel4 <- lm(AdjMinWage ~ PresParty + HouseParty - 
+    1, data = PolData.minWage)
+summary(PolData.minWagemodel4)
+```
+
+Explore the effect of lag on Unemployment
+```{r}
+# lag 1
+PolData.unemp <- PolData[, c(2, 4, 8)]
+PolData.unemp$UnemploymentRateDecember <- c(NA, head(PolData.unemp$UnemploymentRateDecember, -1))
+PolData.unemp <- na.omit(PolData.unemp)
+PolData.unempmodel1 <- lm(UnemploymentRateDecember ~ PresParty + HouseParty - 
+    1, data = PolData.unemp)
+summary(PolData.unempmodel1)
+```
+
+```{r}
+# lag 2
+PolData.unemp$UnemploymentRateDecember <- c(NA, head(PolData.unemp$UnemploymentRateDecember, -1))
+PolData.unemp <- na.omit(PolData.unemp)
+PolData.unempmodel2 <- lm(UnemploymentRateDecember ~ PresParty + HouseParty - 
+    1, data = PolData.unemp)
+summary(PolData.unempmodel2)
+```
+
+```{r}
+# lag 3
+PolData.unemp$UnemploymentRateDecember <- c(NA, head(PolData.unemp$UnemploymentRateDecember, -1))
+PolData.unemp <- na.omit(PolData.unemp)
+PolData.unempmodel3 <- lm(UnemploymentRateDecember ~ PresParty + HouseParty - 
+    1, data = PolData.unemp)
+summary(PolData.unempmodel3)
+```
+
+```{r}
+# lag 4
+PolData.unemp$UnemploymentRateDecember <- c(NA, head(PolData.unemp$UnemploymentRateDecember, -1))
+PolData.unemp <- na.omit(PolData.unemp)
+PolData.unempmodel4 <- lm(UnemploymentRateDecember ~ PresParty + HouseParty - 
+    1, data = PolData.unemp)
+summary(PolData.unempmodel4)
+```
+
+```{r}
+print("ADJUSTED R-SQUARED VALUES WITH LAGS")
+print("no lag     lag 1     lag 2     lag 3     lag 4")
+print("inflation")
+print(c(summary(inflation.backward)$adj.r.squared, summary(PolData.infmodel1)$adj.r.squared, summary(PolData.infmodel2)$adj.r.squared, summary(PolData.infmodel3)$adj.r.squared, summary(PolData.infmodel3)$adj.r.squared))
+print("GDP")
+print(c(summary(GDP.backward)$adj.r.squared, summary(PolData.gdpmodel1)$adj.r.squared, summary(PolData.gdpmodel2)$adj.r.squared, summary(PolData.gdpmodel3)$adj.r.squared, summary(PolData.gdpmodel3)$adj.r.squared))
+print("minimum wage")
+print(c(summary(minimumWage.backward)$adj.r.squared, summary(PolData.minWagemodel1)$adj.r.squared, summary(PolData.minWagemodel2)$adj.r.squared, summary(PolData.minWagemodel3)$adj.r.squared, summary(PolData.minWagemodel4)$adj.r.squared))
+print("unemployment")
+print(c(summary(unemployment.backward)$adj.r.squared, summary(PolData.unempmodel1)$adj.r.squared, summary(PolData.unempmodel2)$adj.r.squared, summary(PolData.unempmodel3)$adj.r.squared, summary(PolData.unempmodel4)$adj.r.squared))
+```
+
+```{r}
+plot(PolData.unempmodel2)
+```
+Examining the qq plot reveals a right skew to the data.  A box cox transformation will be attempted and the response variable transformed.
+
+```{r}
+boxcox_unemp=boxcox(unemployment.backward)
+lambda=boxcox_unemp$x[which.max(boxcox_unemp$y)]
+lambda
+```
+
+```{r}
+PolData.unempmode.box=lm(((UnemploymentRateDecember^lambda-1)/lambda) ~ PresParty + HouseParty - 
+    1, data = PolData.unemp)
+summary(PolData.unempmode.box)
+```
+
+```{r}
+plot(PolData.unempmode.box)
+```
+
+Hypothesis Testing
+
+1. Inflation - model: PolData.infmodel2
+```{r}
+# H0: PresParty = SenParty
+a <- c(1, -1)
+linearHypothesis(PolData.infmodel2, a, 0)
+```
+Since the p-value is 0.7317, the null hypothesis can not be rejected at 90%, 95% and 99% (CL > 26.8%). So we can conclude that, at these confidence levels, the effects of the Presidential Party and the Senate Party are not unequal.
+
+2. GDP - model: PolData.gdpmodel2
+```{r}
+# H0: PresParty = TrifectaFlag
+a <- c(1, -1)
+linearHypothesis(PolData.gdpmodel2, a, 0)
+```
+Since the p-value is 0.6265, the null hypothesis can not be rejected at 90%, 95% and 99% (CL > 37.3%). So we can conclude that, at these confidence levels, the effects of the Presidential Party and the Trifecta Flag are not unequal.
+
+3. Minimum Wage - model: minimumWage.backward
+```{r}
+# H0: PresParty = HouseParty
+a <- c(1, -1)
+linearHypothesis(PolData.minWagemodel3, a, 0)
+```
+Since the p-value is 0.08092, the null hypothesis can not be rejected at 95% and 99% (CL > 91.9%). So we can conclude that, at these confidence levels, the effects of the Presidential Party and the House Party are not unequal. The null hypothesis, however, can be rejected at 90% confidence or lower, meaning that we can say that the effect of the two differs with 90% confidence.
+
+4. Unemployment - model: unemployment.backward
+```{r}
+# H0: PresParty = HouseParty
+a <- c(1, -1)
+linearHypothesis(unemployment.backward, a, 0)
+```
+Since the p-value is 0.3899, the null hypothesis can not be rejected at 90%, 95% and 99% (CL > 61%). So we can conclude that, at these confidence levels, the effects of the Presidential Party and the House Party are not unequal.
